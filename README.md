@@ -1,4 +1,4 @@
-# API Check
+# API Checks
 
 Scripts Node.js pour tester et comparer plusieurs providers IA / API :
 
