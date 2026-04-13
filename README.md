@@ -1,4 +1,4 @@
-# API Check Suite
+# API Check
 
 Scripts Node.js pour tester et comparer plusieurs providers IA / API :
 
