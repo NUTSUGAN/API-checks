@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config({ path: "./.env" });
 
 const PROMPT =
-  "Le meilleur joueur du monde. Qui est-ce et pourquoi ? Donne moi une réponse détaillée en français.";
+  "Explique le concept de récursion à un lycéen, en 3 phrases maximum.";
 
 // Chaque provider a son propre endpoint et ses propres modèles
 const providers = [
