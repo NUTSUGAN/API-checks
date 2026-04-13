@@ -4,7 +4,6 @@ dotenv.config({ path: "./.env" });
 const PROMPT =
   "Explique le concept de récursion à un lycéen, en 3 phrases maximum.";
 
-// Chaque provider a son propre endpoint et ses propres modèles
 const providers = [
   {
     name: "Mistral",
@@ -19,7 +18,7 @@ const providers = [
     model: "llama-3.3-70b-versatile",
   },
   {
-    name: "Hugging Face",
+    name: "HuggingFace",
     url: "https://router.huggingface.co/v1/chat/completions",
     key: process.env.HUGGING_FACE_API_KEY,
     model: "openai/gpt-oss-20b:fireworks-ai",
@@ -30,7 +29,7 @@ function extractContent(data) {
   const content = data?.choices?.[0]?.message?.content;
 
   if (typeof content === "string" && content.trim()) {
-    return content;
+    return content.trim();
   }
 
   if (Array.isArray(content)) {
@@ -50,16 +49,17 @@ function extractContent(data) {
     data?.content?.[0]?.text;
 
   if (typeof altText === "string" && altText.trim()) {
-    return altText;
+    return altText.trim();
   }
 
   return null;
 }
 
-async function callProvider(provider, prompt) {
+async function checkProvider(provider) {
   if (!provider.key) {
     return {
       provider: provider.name,
+      status: "ERROR",
       latency: 0,
       content: null,
       tokens: 0,
@@ -67,7 +67,7 @@ async function callProvider(provider, prompt) {
     };
   }
 
-  const start = Date.now(); // on démarre le chrono
+  const start = Date.now();
 
   try {
     const response = await fetch(provider.url, {
@@ -78,18 +78,19 @@ async function callProvider(provider, prompt) {
       },
       body: JSON.stringify({
         model: provider.model,
-        messages: [{ role: "user", content: prompt }],
+        messages: [{ role: "user", content: PROMPT }],
         temperature: 0.7,
         max_tokens: 120,
       }),
     });
 
     const data = await response.json();
-    const latency = Date.now() - start; // temps total en ms
+    const latency = Date.now() - start;
 
     if (!response.ok) {
       return {
         provider: provider.name,
+        status: "ERROR",
         latency,
         content: null,
         tokens: 0,
@@ -101,18 +102,18 @@ async function callProvider(provider, prompt) {
       };
     }
 
-    const content = extractContent(data);
-
     return {
       provider: provider.name,
+      status: "OK",
       latency,
-      content: content || JSON.stringify(data, null, 2),
+      content: extractContent(data),
       tokens: data?.usage?.total_tokens || 0,
       error: null,
     };
   } catch (error) {
     return {
       provider: provider.name,
+      status: "ERROR",
       latency: Date.now() - start,
       content: null,
       tokens: 0,
@@ -121,37 +122,51 @@ async function callProvider(provider, prompt) {
   }
 }
 
+function displayResult(result) {
+  const icon = result.status === "OK" ? "✅" : "❌";
+  const provider = result.provider.padEnd(12);
+  const latency = `${result.latency}ms`;
+
+  console.log(`${icon} ${provider} ${latency}`);
+
+  if (result.status === "ERROR") {
+    console.log(`   → ${result.error}`);
+  }
+}
+
 async function main() {
-  console.log("MISTRAL_API_KEY =", process.env.MISTRAL_API_KEY);
-  console.log("GROQ_API_KEY =", process.env.GROQ_API_KEY);
-  console.log("HUGGING_FACE_API_KEY =", process.env.HUGGING_FACE_API_KEY);
+  console.log("🔎 Vérification des connexions API...\n");
 
-  // On lance les trois en parallèle avec Promise.all
-  const results = await Promise.all(
-    providers.map((p) => callProvider(p, PROMPT))
-  );
+  const results = await Promise.all(providers.map(checkProvider));
 
-  // Affichage des résultats
-  console.log(`\nPrompt : "${PROMPT}"\n`);
-  console.log("-".repeat(60));
-
-  for (const r of results) {
-    console.log(`${r.provider} | ${r.latency}ms | ${r.tokens} tokens`);
-
-    if (r.error) {
-      console.log(`Erreur : ${r.error}`);
-    } else {
-      console.log(r.content);
-    }
-
-    console.log("-".repeat(60));
+  for (const result of results) {
+    displayResult(result);
   }
 
-  console.log("\nRésumé :");
-  for (const r of results) {
-    console.log(
-      `${r.provider.padEnd(14)} ${String(r.latency).padEnd(6)} ms`
-    );
+  const okCount = results.filter((r) => r.status === "OK").length;
+  const total = results.length;
+
+  console.log(`\n${okCount}/${total} connexions actives\n`);
+
+  if (okCount === total) {
+    console.log("Tout est vert. Vous êtes prêts pour la suite !");
+  } else {
+    console.log("Certaines connexions ont échoué. Vérifiez vos clés ou endpoints.");
+  }
+
+  console.log("\n--- Détail des réponses ---\n");
+
+  for (const result of results) {
+    console.log(`### ${result.provider}`);
+
+    if (result.status === "OK") {
+      console.log(result.content || "Pas de contenu");
+      console.log(`Tokens : ${result.tokens}`);
+    } else {
+      console.log(`Erreur : ${result.error}`);
+    }
+
+    console.log("");
   }
 }
 
